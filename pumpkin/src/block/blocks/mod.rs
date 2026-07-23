@@ -86,6 +86,7 @@ pub mod dragon_egg;
 pub mod falling;
 pub mod grass_block;
 pub mod infested;
+pub mod leaves;
 pub mod powder_snow;
 pub mod snow;
 pub mod sponge;
