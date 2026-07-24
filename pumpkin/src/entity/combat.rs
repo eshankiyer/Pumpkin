@@ -5,6 +5,9 @@ use pumpkin_data::{
     particle::Particle,
     sound::{Sound, SoundCategory},
 };
+use pumpkin_protocol::bedrock::server::animate::{AnimateAction, SAnimate};
+use pumpkin_protocol::codec::var_ulong::VarULong;
+use pumpkin_protocol::java::client::play::{Animation, CEntityAnimation};
 use pumpkin_util::math::vector3::Vector3;
 
 use crate::{
@@ -88,6 +91,45 @@ pub fn spawn_sweep_particle(attacker_entity: &Entity, world: &World, pos: &Vecto
         0,
         Particle::SweepAttack,
     );
+}
+
+/// Sends the critical-hit animations for a landed melee attack.
+///
+/// The vanilla client draws crit particles only when it receives these
+/// packets, so the server has to send them; it does not predict them
+/// locally, not even for the attacking player. Vanilla sends both for the
+/// same hit when an enchanted weapon lands a crit.
+pub fn send_crit_animations(
+    world: &World,
+    victim: &Entity,
+    attack_type: AttackType,
+    scaled_enchantment_damage: f64,
+) {
+    let chunk_pos = victim.chunk_pos.load();
+    let entity_id = victim.entity_id;
+
+    let mut send = |java: Animation, bedrock: AnimateAction| {
+        world.broadcast_to_chunk_editioned_sync(
+            chunk_pos,
+            &CEntityAnimation::new(entity_id.into(), java),
+            &SAnimate {
+                action: bedrock,
+                runtime_entity_id: VarULong(entity_id as u64),
+                data: 0.0,
+                swing_source: None,
+            },
+        );
+    };
+
+    if attack_type == AttackType::Critical {
+        send(Animation::CriticalEffect, AnimateAction::CriticalHit);
+    }
+    if scaled_enchantment_damage > 0.0 {
+        send(
+            Animation::MagicCriticaleffect,
+            AnimateAction::MagicCriticalHit,
+        );
+    }
 }
 
 pub async fn player_attack_sound(pos: &Vector3<f64>, world: &World, attack_type: AttackType) {

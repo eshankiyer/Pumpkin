@@ -1052,6 +1052,16 @@ impl Player {
             return;
         }
 
+        // Only living entities show crit particles in vanilla.
+        if victim.get_living_entity().is_some() {
+            combat::send_crit_animations(
+                &world,
+                victim_entity,
+                attack_type,
+                extra_ench_damage * attack_cooldown_progress,
+            );
+        }
+
         if damage >= 100.0 {
             self.trigger_advancement(crate::entity::player::advancement::trigger::AdvancementTrigger::DealtOverkillDamage).await;
         }
