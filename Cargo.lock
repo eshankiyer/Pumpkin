@@ -2587,6 +2587,7 @@ dependencies = [
  "hyper",
  "image",
  "indexmap",
+ "libc",
  "libloading",
  "notify",
  "num-bigint",
