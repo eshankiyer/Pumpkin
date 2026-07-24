@@ -20,8 +20,11 @@ bitflags! {
         /// Combines neighbor notification and listener notification.
         /// This is the "standard" update used for most block placements
         const NOTIFY_ALL                            = 0b000_0000_0011;
-        /// Forces the block state to be set even if it matches the current state
-        /// Used by items like the Debug Stick to bypass "virtual" change checks
+        /// The resulting shape is already known, so the shape-update pass is
+        /// skipped: neighbouring blocks are not asked to recompute their own
+        /// state via `get_state_for_neighbor_update`. This is vanilla's
+        /// `UPDATE_KNOWN_SHAPE`, used when the caller has already placed the
+        /// surrounding blocks in their final form.
         const FORCE_STATE                           = 0b000_0000_0100;
         /// Prevents the previous block from dropping items when it is replaced
         /// Commonly used when a block is "transformed" rather than destroyed
