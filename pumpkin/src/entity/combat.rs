@@ -22,8 +22,37 @@ pub enum AttackType {
     MaceSmash,
 }
 
+#[derive(Clone, Copy)]
+struct CriticalAttackContext {
+    full_strength: bool,
+    on_ground: bool,
+    fall_distance: f32,
+    mobility_restricted: bool,
+    climbing: bool,
+    touching_water: bool,
+    has_vehicle: bool,
+    sprinting: bool,
+    target_is_living: bool,
+}
+
+const fn can_critical_attack(context: CriticalAttackContext) -> bool {
+    context.full_strength
+        && !context.on_ground
+        && context.fall_distance > 0.0
+        && !context.mobility_restricted
+        && !context.climbing
+        && !context.touching_water
+        && !context.has_vehicle
+        && !context.sprinting
+        && context.target_is_living
+}
+
 impl AttackType {
-    pub async fn new(player: &Player, attack_cooldown_progress: f32) -> Self {
+    pub async fn new(
+        player: &Player,
+        attack_cooldown_progress: f32,
+        target_is_living: bool,
+    ) -> Self {
         let entity = &player.get_entity();
 
         let sprinting = entity.is_sprinting();
@@ -35,6 +64,12 @@ impl AttackType {
             stack.item.id == pumpkin_data::item::Item::MACE.id
         };
 
+        let mobility_restricted = player
+            .living_entity
+            .has_effect(&pumpkin_data::effect::StatusEffect::BLINDNESS)
+            .await;
+        let has_vehicle = entity.has_vehicle().await;
+
         if is_mace && !on_ground && fall_distance > 1.5 {
             return Self::MaceSmash;
         }
@@ -43,17 +78,33 @@ impl AttackType {
             let stack = held_item.lock().await;
             stack.is_sword()
         };
+        let max_sweep_speed = player
+            .living_entity
+            .get_attribute_value(&pumpkin_data::attributes::Attributes::MOVEMENT_SPEED)
+            * 2.5;
+        let sweep_speed_ok =
+            entity.velocity.load().horizontal_length_squared() < max_sweep_speed * max_sweep_speed;
 
         let is_strong = attack_cooldown_progress > 0.9;
         if sprinting && is_strong {
             return Self::Knockback;
         }
 
-        if is_strong && !on_ground && fall_distance > 0.0 {
+        if can_critical_attack(CriticalAttackContext {
+            full_strength: is_strong,
+            on_ground,
+            fall_distance,
+            mobility_restricted,
+            climbing: player.living_entity.climbing.load(Ordering::Relaxed),
+            touching_water: entity.touching_water.load(Ordering::Relaxed),
+            has_vehicle,
+            sprinting,
+            target_is_living,
+        }) {
             return Self::Critical;
         }
 
-        if sword && is_strong {
+        if sword && is_strong && on_ground && sweep_speed_ok {
             return Self::Sweeping;
         }
 
@@ -113,6 +164,55 @@ pub async fn player_attack_sound(pos: &Vector3<f64>, world: &World, attack_type:
         }
         AttackType::MaceSmash => {
             world.play_sound(Sound::ItemMaceSmashAir, SoundCategory::Players, pos);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CriticalAttackContext, can_critical_attack};
+
+    fn context() -> CriticalAttackContext {
+        CriticalAttackContext {
+            full_strength: true,
+            on_ground: false,
+            fall_distance: 1.0,
+            mobility_restricted: false,
+            climbing: false,
+            touching_water: false,
+            has_vehicle: false,
+            sprinting: false,
+            target_is_living: true,
+        }
+    }
+
+    #[test]
+    fn critical_attacks_require_vanilla_mobility_conditions() {
+        assert!(can_critical_attack(context()));
+
+        for blocked in [
+            CriticalAttackContext {
+                mobility_restricted: true,
+                ..context()
+            },
+            CriticalAttackContext {
+                climbing: true,
+                ..context()
+            },
+            CriticalAttackContext {
+                touching_water: true,
+                ..context()
+            },
+            CriticalAttackContext {
+                sprinting: true,
+                ..context()
+            },
+            CriticalAttackContext {
+                target_is_living: false,
+                ..context()
+            },
+        ] {
+            assert!(!can_critical_attack(blocked));
         }
     }
 }
