@@ -2315,7 +2315,9 @@ impl EntityBase for LivingEntity {
                     }
 
                     let active_hand = self.active_hand.lock().await;
-                    if let Some(hand) = *active_hand {
+                    if let Some(hand) = *active_hand
+                        && amount >= 3.0
+                    {
                         let slot = if hand == Hand::Left {
                             EquipmentSlot::MAIN_HAND
                         } else {
@@ -2326,7 +2328,7 @@ impl EntityBase for LivingEntity {
                         let stack_arc = equipment_lock.get(&slot);
                         let mut stack = stack_arc.lock().await;
 
-                        let durability_damage = (amount / 1.0).floor().max(1.0) as i32;
+                        let durability_damage = (1.0 + amount).floor() as i32;
                         if stack.damage_item(durability_damage) == DamageResult::Broken {
                             if let Some(player) = caller.get_player() {
                                 player
