@@ -9,8 +9,10 @@ use crate::block::{
 use crate::entity::Entity;
 use crate::entity::item::ItemEntity;
 use crate::world::World;
+use crate::world::game_event::{GameEventContext, emit_game_event};
 use pumpkin_data::data_component_impl::JukeboxPlayableImpl;
 use pumpkin_data::entity::EntityType;
+use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::jukebox_song::JukeboxSong;
 use pumpkin_data::world::WorldEvent;
 use pumpkin_data::{
@@ -176,7 +178,22 @@ impl BlockBehaviour for JukeboxBlock {
                 )
                 .await;
 
-            // TODO: world.emitGameEvent(GameEvent.BLOCK_CHANGE, pos, ...)
+            // Vanilla JukeboxBlockEntity.java:44 -- emits BLOCK_CHANGE when a record is
+            // inserted. Vanilla's context carries the block's new state; Pumpkin's
+            // GameEventContext has no block-state variant, so this uses none() as a
+            // documented simplification, matching other emission sites this session.
+            let block_center = Vector3::new(
+                f64::from(args.position.0.x) + 0.5,
+                f64::from(args.position.0.y) + 0.5,
+                f64::from(args.position.0.z) + 0.5,
+            );
+            emit_game_event(
+                world,
+                GameEvent::BlockChange,
+                block_center,
+                GameEventContext::none(),
+            )
+            .await;
 
             BlockActionResult::Success
         })
