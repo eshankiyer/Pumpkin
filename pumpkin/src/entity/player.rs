@@ -506,6 +506,10 @@ pub struct Player {
     pub experience_pick_up_delay: Mutex<u32>,
     pub chunk_manager: Mutex<ChunkManager>,
     pub has_played_before: AtomicBool,
+    /// `ServerPlayer.seenCredits`: whether this player has ever crossed the End's exit portal.
+    /// The first crossing shows the end credits instead of teleporting; only later crossings
+    /// perform the normal portal teleport.
+    pub seen_credits: AtomicBool,
     pub chat_session: Arc<Mutex<ChatSession>>,
     pub signature_cache: Mutex<MessageCache>,
     pub player_screen_handler: Arc<Mutex<PlayerScreenHandler>>,
@@ -739,6 +743,7 @@ impl Player {
             last_food_saturation: AtomicBool::new(true),
             subscribed_debug_sample: AtomicBool::new(false),
             has_played_before: AtomicBool::new(false),
+            seen_credits: AtomicBool::new(false),
             chat_session: Arc::new(Mutex::new(ChatSession::default())), // Placeholder value until the player actually sets their session id
             signature_cache: Mutex::new(MessageCache::default()),
             player_screen_handler: player_screen_handler.clone(),
@@ -4341,6 +4346,7 @@ impl NBTStorage for Player {
                 "HasPlayedBefore",
                 self.has_played_before.load(Ordering::Relaxed),
             );
+            nbt.put_bool("seenCredits", self.seen_credits.load(Ordering::Relaxed));
 
             // Store food level, saturation, exhaustion, and tick timer
             self.hunger_manager.write_nbt(nbt).await;
@@ -4407,6 +4413,10 @@ impl NBTStorage for Player {
 
             self.has_played_before.store(
                 nbt.get_bool("HasPlayedBefore").unwrap_or(false),
+                Ordering::Relaxed,
+            );
+            self.seen_credits.store(
+                nbt.get_bool("seenCredits").unwrap_or(false),
                 Ordering::Relaxed,
             );
 
