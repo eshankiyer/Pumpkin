@@ -163,10 +163,10 @@ impl Mob for OcelotEntity {
         item_stack: &'a mut ItemStack,
     ) -> EntityBaseFuture<'a, bool> {
         Box::pin(async move {
-            // Vanilla Ocelot.mobInteract: while untrusting, feeding ocelot food within 3 blocks
-            // has a 1-in-3 chance of making the ocelot trust the player. This branch consumes the
-            // item and returns before the Animal breeding path, so an untrusting ocelot never
-            // enters love mode.
+            // Vanilla Ocelot.mobInteract: while the tempt goal is running and the ocelot is not
+            // yet trusting, feeding ocelot food within 3 blocks consumes the item and has a
+            // 1-in-3 chance of making the ocelot trust the player. Anything else falls through
+            // to the Animal path (love mode / baby growth), exactly like super.mobInteract.
             let entity = &self.mob_entity.living_entity.entity;
             let dist_sq = player
                 .get_entity()
