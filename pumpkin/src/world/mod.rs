@@ -21,6 +21,7 @@ use tracing::{debug, error, info, trace, warn};
 
 pub mod chunker;
 pub mod explosion;
+pub mod game_event;
 pub mod loot;
 pub mod map;
 pub mod portal;
@@ -228,6 +229,9 @@ pub struct World {
     /// Block entities indexed by chunk, so ticking only visits the currently
     /// active chunks instead of scanning every loaded block entity each tick.
     pub block_entities: DashMap<Vector2<i32>, FxHashMap<BlockPos, Arc<dyn BlockEntity>>>,
+    /// Registered game event listeners (sculk sensors, and future consumers such as
+    /// the Warden or Allays).
+    pub game_event_listeners: Mutex<Vec<Arc<dyn game_event::GameEventListener>>>,
 }
 
 impl PartialEq for World {
@@ -316,7 +320,21 @@ impl World {
             forced_chunks: std::sync::Mutex::new(FxHashSet::default()),
             server,
             block_entities: DashMap::new(),
+            game_event_listeners: Mutex::new(Vec::new()),
         }
+    }
+
+    pub async fn register_game_event_listener(
+        &self,
+        listener: Arc<dyn game_event::GameEventListener>,
+    ) {
+        self.game_event_listeners.lock().await.push(listener);
+    }
+
+    pub async fn unregister_game_event_listener_at(&self, pos: &BlockPos) {
+        self.game_event_listeners.lock().await.retain(|listener| {
+            !matches!(listener.listener_source(), game_event::PositionSource::Block(listener_pos) if listener_pos == *pos)
+        });
     }
 
     pub fn update_active_chunks(self: &Arc<Self>) {
